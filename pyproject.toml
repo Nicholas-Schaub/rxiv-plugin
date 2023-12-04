@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "polus-plugins-data-rxiv"
+version = "0.1.0"
+description = ""
+authors = ["nicholas-schaub <nicholas.j.schaub@gmail.com>"]
+readme = "README.md"
+packages = [{include = "polus", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "1.10.4"
+requests = "^2.31.0"
+rxiv-types = "^0.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.11.0"
+mypy = "^1.7.0"
+flake8 = "^6.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
