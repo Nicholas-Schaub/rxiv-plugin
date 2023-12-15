@@ -1,9 +1,10 @@
+import logging
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 from xsdata.models.datatype import XmlDate
 
 import requests
@@ -13,7 +14,14 @@ from rxiv_types.models.oai_pmh.org.openarchives.oai.pkg_2.resumption_token_type 
 from rxiv_types import arxiv_records
 from tqdm import tqdm
 
-RXIVS = {"arXiv": {"url": "https://export.arxiv.org/oai2", "stride": 1000}}
+logging.basicConfig(
+    format="%(asctime)s - %(name)-8s - %(levelname)-8s - %(message)s",
+    datefmt="%d-%b-%y %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+RXIVS = {"arxiv": {"url": "https://export.arxiv.org/oai2", "stride": 1000}}
 
 
 def path_from_token(
@@ -99,10 +107,13 @@ def resume_from(path: Path, rxiv: str) -> datetime:
     Args:
         path: Path to store rxiv data.
     """
-    if not path.joinpath(rxiv).exists():
+    out_path = path.joinpath(rxiv).joinpath("xml")
+    if not out_path.exists():
         return datetime(1900, 1, 1)
 
-    files = [f for f in path.iterdir() if f.is_file() and f.name.startswith(rxiv)]
+    files = [
+        f for f in out_path.iterdir() if f.is_file() and f.name.lower().startswith(rxiv)
+    ]
 
     with ProcessPoolExecutor() as executor:
         dates = list(executor.map(_get_latest, files))
@@ -130,27 +141,34 @@ def fetch_and_store(
                     last = record_date
         except Exception:
             try_count += 1
-            print(
-                f"Try {try_count}, {token.value}: "
-                + "There was an error, waiting 5 seconds and trying again..."
-            )
-            time.sleep(5)
+
+            if try_count < 5:
+                logger.debug(
+                    f"Try {try_count}, {token.value}: "
+                    + "There was an error, waiting 5 seconds and trying again..."
+                )
+                time.sleep(5)
+            else:
+                raise
+    path = path.joinpath(rxiv.lower()).joinpath("xml")
     path = path_from_token(path, rxiv, token, call_start)
     store_records(path, records)
-    time.sleep(7)
+    time.sleep(10)
 
 
-def fetch_and_store_all(rxiv: str, path: Path):
+def fetch_arxiv_xml(rxiv: str, path: Path):
     path.mkdir(exist_ok=True)
 
     token = None
 
-    print(f"Finding resumption date...")
+    logger.info(f"Finding resumption date...")
     last = resume_from(path, rxiv)
+
+    logger.info(f"Resuming from date: {last}")
 
     now = datetime.now()
 
-    print("Getting token...")
+    logger.info("Getting token...")
     records = arxiv_records(BytesIO(fetch_records(rxiv, start=last)))
 
     assert records.list_records is not None
@@ -166,11 +184,9 @@ def fetch_and_store_all(rxiv: str, path: Path):
     index = token.cursor
     assert token.complete_list_size is not None
 
-    print(f"Resuming from date: {last}")
-
     for i in tqdm(
         range(int(index), token.complete_list_size, 1000),
         total=((token.complete_list_size - int(index)) // 1000 + 1),
     ):
         thread_token = ResumptionTokenType(value="|".join([key, str(i)]), cursor=i)
-        fetch_and_store("arXiv", thread_token, path, now)
+        fetch_and_store(rxiv, thread_token, path, now)

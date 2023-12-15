@@ -11,6 +11,15 @@ python = "^3.10"
 pydantic = "1.10.4"
 requests = "^2.31.0"
 rxiv-types = "^0.1.0"
+boto3 = "^1.33.11"
+python-dotenv = "^1.0.0"
+torch = "^2.1.1"
+torchvision = "^0.16.1"
+torchaudio = "^2.1.1"
+instructorembedding = "^1.0.1"
+faiss-gpu = "^1.7.2"
+langchain = "^0.0.350"
+sentence-transformers = "^2.2.2"
 
 
 [tool.poetry.group.dev.dependencies]
